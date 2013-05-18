@@ -63,12 +63,12 @@ class HUGEMOOSE
 
 		# Precompile the template engines so they render super fast later.
 		for service_id, service in @configuration.services
-			for config_location, template_path in services.templates
-				@configuration.services[service_id].templates[config_location] = swig.compileFile(template_path)
+			for config_location, template_path in @configuration.templates[service_id]
+				@configuration.templates[service_id][config_location] = swig.compileFile(template_path)
 
 	deploy_configurations: ->
 		for service_id, service in @configuration.services
-			for config_location, config_template in service.templates
+			for config_location, config_template in @configuration.templates[service_id]
 				data = @render_configuration service_id, config_template
 
 				fs.writeFile(config_location, data, function (err) {
