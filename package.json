@@ -1,0 +1,33 @@
+{
+  "name":        "hugemoose",
+  "version":     "0.0.1",
+
+  "author":      "Israel Shirk",
+
+  "keywords":    [
+  	"huge",
+  	"freaking",
+  	"moose"
+  ],
+
+  "description": "Huge Moose is your very best friend.  He keeps your configs up to date while you scale, so you don't have to!",
+
+  "licenses": [{
+    "type": "MIT",
+    "url": "http://github.com/github/hubot/raw/master/LICENSE"
+  }],
+
+  "repository" : {
+    "type": "git",
+    "url":  "git@github.com:israelshirk/hugemoose.git"
+  },
+
+  "dependencies": {
+    "swig": ">=0.13.5"
+  },
+
+  "engines": {
+    "node": ">= 0.8.x",
+    "npm":  ">= 1.1.x"
+  }
+}
