@@ -47,34 +47,43 @@ class HUGEMOOSE
 
 	load_default_config: ->
 		config_file = process.env.HUBOT_HUGEMOOSE_CONFIG || '/etc/hubot_hugemoose.conf'
-		config_text = fs.readFile(config_file).toString()
-		
-		console.log "before config text"
-		console.log config_text
-		console.log "after config text"
-
-		console.log "Loading config from " + config_file
-		console.log "Config text: " + config_text
+		config_text = fs.readFileSync(config_file).toString()
 
 		try
 			@configuration = JSON.parse config_text
 		catch error
-			@notify_config_error
+			do @notify_config_error
 
 			return
+
+		console.log "Hugemoose loaded configuration", @configuration
 
 		# Could just be a syntax issue
-		if object.prototype.toString.call( config ) != "[object object]"
-			@notify_config_error
+		if typeof @configuration != "object"
+			@notify_config_error "Could not parse JSON"
 
 			return
+
+		if not @configuration.services
+			if @configuration.services != {}
+				do @notify_config_error "Could not read services!"
+				return
+
+		if not @configuration.external_validators
+			@configuration.external_validators = {}
 
 		# Precompile the template engines so they render super fast later.
 		for service_id, service in @configuration.services
 			for config_location, template_path in @configuration.templates[service_id]
 				@configuration.templates[service_id][config_location] = swig.compileFile(template_path)
 
+	notify_config_error: ->
+		console.log "Configuration error!"
+		crash
+
 	deploy_configurations: ->
+		console.log @configuration
+
 		for service_id, service in @configuration.services
 			for config_location, config_template in @configuration.templates[service_id]
 				data = @render_configuration service_id, config_template
@@ -116,9 +125,11 @@ class HUGEMOOSE
 
 	load_new_config: (server_id, service_id, text_config, msg) ->
 		if not @configuration
+			console.log "Could not find default config; reloading"
 			do @load_default_config
 
 		if not @configuration.services[service_id]
+			console.log "Configuration for service " + service_id + " Not found"
 			return
 
 		try
@@ -129,6 +140,7 @@ class HUGEMOOSE
 			return false
 
 		if service_config == @configuration.services[service_id].available_handlers[server_id]
+			console.log "Configuration is unchanged; ignoring."
 			return
 
 		@validate_configuration_external server_id, service_id, service_config, msg, true
@@ -151,6 +163,7 @@ class HUGEMOOSE
 
 	validate_configuration_external: (server_id, service_id, service_config, msg, apply_on_validate) ->
 		if not @configuration.external_validators[service_id]
+			console.log "Skipping external validation"
 			@validate_configuration server_id, service_id, service_config, msg, apply_on_validate
 			return
 
@@ -174,6 +187,8 @@ class HUGEMOOSE
 	validate_configuration: (server_id, service_id, service_config, msg, apply_on_validate) ->
 		@safety_configuration = clone @configuration
 
+		console.log "Skipping external validation"
+
 		for config_location, config_template in @configuration.services[service_id]
 			try
 				data = @render_configuration service_id, config_template
@@ -187,12 +202,10 @@ class HUGEMOOSE
 		if apply_on_validate
 			@configuration.services[service_id].available_handlers[server_id] = service_config
 
-			@deploy_configurations
-configuration = {}
+			do @deploy_configurations
 
 module.exports = (robot) ->
 	robot.respond /hugemoose alive (\w*) (\w*) (.*)$/i, (msg) ->
-		# console.log msg
 		moose.load_new_config msg.match[1], msg.match[2], msg.match[3], msg
 
 	robot.respond /hugemoose down (\w*) (\w*)?/i, (msg) ->
