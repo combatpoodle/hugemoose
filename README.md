@@ -7,31 +7,30 @@ This keeps your application's configuration spic and span during scaling and mig
 Config sample:
 ```
 {
-	'templates': {
-		'mysql': {
-			'/var/www/public/wp-config.php': '/etc/hugemoose.d/wp-config.php'
+	"templates": {
+		"mysql": {
+			"/var/www/public/wp-config.php": "/etc/hugemoose.d/wp-config.php"
 		}
-	}
-	'services': {
-		'mysql': {
-			'immutable_handlers': {
-				'1.2.3.4': {
-					'database': 'asdfghjkl',
-					'host': '1.2.3.4',
-					'port': '13306',
-					'write': true
+	},
+	"services": {
+		"mysql": {
+			"immutable_handlers": {
+				"1.2.3.4": {
+					"database": "asdfghjkl",
+					"host": "1.2.3.4",
+					"port": "13306",
+					"write": true
 				}
 			},
-			'available_handlers': {
-				'1.2.3.5': {
-					'database': 'asldkfj',
-					'host': '1.2.3.5',
-					'port': '234567',
-					'write': false
+			"available_handlers": {
+				"1.2.3.5": {
+					"database": "asldkfj",
+					"host": "1.2.3.5",
+					"port": "234567",
+					"write": false
 				}
 			}
-		},
+		}
 	}
 }
-
 ```
