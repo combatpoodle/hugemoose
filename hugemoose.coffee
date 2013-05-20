@@ -15,7 +15,6 @@ Array::moose_unique = ->
 	value for key, value of output
 
 clone = (obj, depth=0) ->
-	console.log "in clone with obj ", obj
 	if not obj? or typeof obj isnt 'object' or depth > 10
 		return obj
 
@@ -44,6 +43,13 @@ class HUGEMOOSE
 		do @load_default_config
 
 		do @deploy_configurations
+
+		me = @
+
+		_update = () ->
+			do me.expire_configurations
+
+		setInterval _update, 1000
 
 	load_default_config: ->
 		config_file = process.env.HUBOT_HUGEMOOSE_CONFIG || '/etc/hubot_hugemoose.conf'
@@ -75,11 +81,22 @@ class HUGEMOOSE
 
 		console.log @configuration.services
 
+		timestamp = Math.round((new Date()).getTime() / 1000)
+
+		@timeout_period = @configuration.timeout_period || 60
+
+		@timeouts = {}
+
 		for service_id, service of @configuration.services
 			console.log "hi service_id " + service_id
 			for config_location, template_path of @configuration.templates[service_id]
 				console.log "precompiling " + service_id + " template " + template_path
 				@configuration.templates[service_id][config_location] = swig.compileFile(template_path)
+
+			@timeouts[service_id] = {}
+
+			for server_id, server_config of @configuration.services[service_id].available_handlers
+				@timeouts[service_id][server_id] = timestamp
 
 	notify_config_error: (msg) ->
 		console.log "Configuration error!  " + msg
@@ -100,7 +117,6 @@ class HUGEMOOSE
 					else
 						console.log "Updated service " + service_id + " at " + config_location
 
-
 	render_configuration: (service_id, config_templater) ->
 		available_handlers = @configuration.services[service_id].available_handlers || {}
 
@@ -114,6 +130,8 @@ class HUGEMOOSE
 		for server_id, handler of immutable_handlers
 			all_handlers[server_id] = handler
 
+		console.log "All_handlers", all_handlers
+
 		try
 			data = config_templater.render( {
 					'configuration': @configuration,
@@ -126,6 +144,23 @@ class HUGEMOOSE
 			@msg.send("Couldn't compile config!")
 
 		return data
+
+	expire_configurations: ->
+		timestamp = Math.round((new Date()).getTime() / 1000)
+
+		changed = false
+
+		for service_id of @timeouts
+			for server_id of @timeouts[service_id]
+				if @timeouts[service_id][server_id] < timestamp - @configuration.timeout_period
+					changed = true
+
+					delete @configurations.services[service_id].available_handlers[server_id]
+					delete @timeouts[service_id][server_id]
+
+		if changed
+			do @deploy_configurations
+
 
 	load_new_config: (server_id, service_id, text_config, msg) ->
 		if not @configuration
@@ -145,9 +180,9 @@ class HUGEMOOSE
 
 		if service_config == @configuration.services[service_id].available_handlers[server_id]
 			console.log "Configuration is unchanged; ignoring."
-			return
-
-		@validate_configuration_external server_id, service_id, service_config, msg, true
+			@validate_configuration_external server_id, service_id, service_config, msg, false
+		else
+			@validate_configuration_external server_id, service_id, service_config, msg, true
 
 	remove_service_from_config: (server_id, service_id) ->
 		if not @configurations.services[service_id]
@@ -187,7 +222,7 @@ class HUGEMOOSE
 		data = JSON.stringify { 'server_id': server_id, 'service_id': service_id, 'service_config': service_config, 'configuration': @configuration }
 
 		script_validator.stdin.write data
-		script_validator.stdin.end 
+		do script_validator.stdin.end 
 
 		new_config = ""
 
@@ -237,7 +272,9 @@ class HUGEMOOSE
 				msg.send "Could not parse request!"
 				callback false
 
-		console.log "About to apply configuration"
+		console.log "About to apply configuration", service_config
+
+		@timeouts[service_id][server_id] = Math.round((new Date()).getTime() / 1000)
 
 		if apply_on_validate
 			@configuration.services[service_id].available_handlers[server_id] = service_config
@@ -245,22 +282,20 @@ class HUGEMOOSE
 			do @deploy_configurations
 
 module.exports = (robot) ->
-	robot.respond /hugemoose\s+alive\s+([^\s]*) ([^\s]*) (.*)$/i, (msg) ->
-		moose.load_new_config msg.match[1], msg.match[2], msg.match[3], msg
+	robot.respond /(hugemoose|ImaginarySquid)\s+alive\s+([^\s]*) ([^\s]*) (.*)$/i, (msg) ->
+		moose.load_new_config msg.match[2], msg.match[3], msg.match[4], msg
 
-	robot.respond /hugemoose\s+down\s+([^\s]+)$/i, (msg) ->
-		moose.remove_server_from_config msg.match[1]
+	robot.respond /(hugemoose|ImaginarySquid)\s+down\s+([^\s]+)$/i, (msg) ->
+		moose.remove_server_from_config msg.match[2]
 
-	robot.respond /hugemoose\s+down\s+([^\s]+)\s+([^\s]+)$/i, (msg) ->
+	robot.respond /(hugemoose|ImaginarySquid)\s+down\s+([^\s]+)\s+([^\s]+)$/i, (msg) ->
 
-		if msg.match[1] && msg.match[2]
-			moose.remove_service_from_config msg.match[1], msg.match[2], msg
+		if msg.match[2] && msg.match[3]
+			moose.remove_service_from_config msg.match[2], msg.match[3], msg
 		else
-			moose.remove_server_from_config msg.match[1]
+			moose.remove_server_from_config msg.match[2]
 
 moose = new HUGEMOOSE
-
-
 
 
 
